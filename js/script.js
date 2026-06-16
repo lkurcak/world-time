@@ -34,8 +34,70 @@ const timezoneInput = document.getElementById('timezone-input');
 const addBtn = document.getElementById('add-btn');
 const timezoneList = document.getElementById('timezone-list');
 const resetBtn = document.getElementById('reset-btn');
+const shareBtn = document.getElementById('share-btn');
 
 const allTimezones = getAllTimezones();
+const LS_KEY = 'world-time-state';
+
+function serializeState() {
+    const params = new URLSearchParams();
+    state.timezones.forEach(tz => params.append('tz', tz));
+    params.set('zoom', Math.round(state.zoom * 100) / 100);
+    params.set('offset', Math.round(state.scrollOffset * 100) / 100);
+    if (state.persistedHours !== null) {
+        params.set('persist', Math.round(state.persistedHours * 100) / 100);
+    }
+    return params.toString();
+}
+
+function deserializeState(search) {
+    const params = new URLSearchParams(search);
+    const timezones = params.getAll('tz');
+    if (timezones.length === 0) return null;
+    const zoom = parseFloat(params.get('zoom')) || 12;
+    const offset = parseFloat(params.get('offset')) || 0;
+    const persist = params.has('persist') ? parseFloat(params.get('persist')) : null;
+    return { timezones, zoom, offset, persist };
+}
+
+function saveState() {
+    const data = {
+        timezones: state.timezones,
+        zoom: state.zoom,
+        scrollOffset: state.scrollOffset,
+        persistedHours: state.persistedHours,
+    };
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
+}
+
+function loadState() {
+    try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+}
+
+function clearUrlParams() {
+    if (window.location.search) {
+        window.history.replaceState({}, '', window.location.pathname);
+    }
+}
+
+function handleShare() {
+    const params = serializeState();
+    const url = window.location.origin + window.location.pathname + '?' + params;
+    navigator.clipboard.writeText(url).then(() => {
+        shareBtn.textContent = 'Copied!';
+        shareBtn.classList.add('copied');
+        setTimeout(() => {
+            shareBtn.textContent = 'Share';
+            shareBtn.classList.remove('copied');
+        }, 1500);
+    });
+}
 
 function getFirstTrackRect() {
     if (state.tracks.length === 0) return null;
@@ -79,17 +141,22 @@ function setZoom(newZoom, cursorX) {
 
     state.zoom = clampedZoom;
     renderAll();
+    saveState();
 }
 
 function setScrollOffset(newScrollOffset) {
     state.scrollOffset = newScrollOffset;
     renderAll();
+    saveState();
 }
 
 function resetView() {
     state.zoom = 12;
     state.scrollOffset = 0;
+    state.persistedHours = null;
+    clearPersistedLine(state.tracks);
     renderAll();
+    saveState();
 }
 
 function renderAll() {
@@ -114,6 +181,7 @@ function addTimezone(timezone) {
     updateAllTrackTimes(state.tracks);
     highlightCurrentHour(state.tracks);
     renderAll();
+    saveState();
 }
 
 function removeTimezone(timezone) {
@@ -130,6 +198,7 @@ function removeTimezone(timezone) {
         state.persistedHours = null;
     }
     renderAll();
+    saveState();
 }
 
 function handleAdd() {
@@ -220,6 +289,7 @@ function handleClick(e) {
         state.persistedHours = hours;
         persistLine(state.persistedHours, state.tracks, state.zoom, state.scrollOffset);
     }
+    saveState();
 }
 
 function handleWheel(e) {
@@ -302,7 +372,24 @@ function handleTouchEnd(e) {
 function init() {
     populateTimezoneList(timezoneList, COMMON_TIMEZONES);
 
-    addTimezone(getLocalTimezone());
+    const urlState = deserializeState(window.location.search);
+    if (urlState) {
+        state.zoom = urlState.zoom;
+        state.scrollOffset = urlState.offset;
+        state.persistedHours = urlState.persist;
+        urlState.timezones.forEach(tz => addTimezone(tz));
+        clearUrlParams();
+    } else {
+        const saved = loadState();
+        if (saved) {
+            state.zoom = saved.zoom;
+            state.scrollOffset = saved.scrollOffset;
+            state.persistedHours = saved.persistedHours;
+            saved.timezones.forEach(tz => addTimezone(tz));
+        } else {
+            addTimezone(getLocalTimezone());
+        }
+    }
 
     addBtn.addEventListener('click', handleAdd);
     timezoneInput.addEventListener('keypress', (e) => {
@@ -311,6 +398,7 @@ function init() {
         }
     });
     resetBtn.addEventListener('click', resetView);
+    shareBtn.addEventListener('click', handleShare);
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mousedown', handleMouseDown);
