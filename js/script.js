@@ -26,6 +26,7 @@ const state = {
     scrollOffset: 0,
     isDragging: false,
     dragStart: { x: 0, scrollOffset: 0 },
+    lastMouseX: null,
 };
 
 const tracksContainer = document.getElementById('tracks-container');
@@ -62,10 +63,21 @@ function pixelToHours(pixelX) {
     return state.scrollOffset + (fraction - 0.5) * (2 * state.zoom);
 }
 
-function setZoom(newZoom) {
+function setZoom(newZoom, cursorX) {
     const minZoom = 1.5;
     const maxZoom = 168;
-    state.zoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+    const clampedZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+
+    if (cursorX !== undefined && state.tracks.length > 0) {
+        const rect = getFirstTrackRect();
+        if (rect && cursorX >= rect.left && cursorX <= rect.right) {
+            const fraction = (cursorX - rect.left) / rect.width;
+            const hoursUnderCursor = state.scrollOffset + (fraction - 0.5) * (2 * state.zoom);
+            state.scrollOffset = hoursUnderCursor - (fraction - 0.5) * (2 * clampedZoom);
+        }
+    }
+
+    state.zoom = clampedZoom;
     renderAll();
 }
 
@@ -141,6 +153,8 @@ function handleAdd() {
 }
 
 function handleMouseMove(e) {
+    state.lastMouseX = e.clientX;
+
     if (state.isDragging) {
         const dx = e.clientX - state.dragStart.x;
         const width = getTrackWidth();
@@ -215,10 +229,12 @@ function handleWheel(e) {
         return;
     }
 
+    const cursorX = e.clientX;
+
     if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const zoomFactor = Math.exp(-e.deltaY * 0.001);
-        setZoom(state.zoom * zoomFactor);
+        setZoom(state.zoom * zoomFactor, cursorX);
     } else if (e.shiftKey) {
         e.preventDefault();
         const width = getTrackWidth();
@@ -235,7 +251,7 @@ function handleWheel(e) {
         } else {
             e.preventDefault();
             const zoomFactor = Math.exp(-e.deltaY * 0.001);
-            setZoom(state.zoom * zoomFactor);
+            setZoom(state.zoom * zoomFactor, cursorX);
         }
     }
 }
@@ -266,7 +282,8 @@ function handleTouchMove(e) {
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const distance = Math.sqrt(dx * dx + dy * dy);
         const zoomFactor = distance / state.pinchStartDistance;
-        setZoom(state.pinchStartZoom * zoomFactor);
+        const cursorX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        setZoom(state.pinchStartZoom * zoomFactor, cursorX);
     }
 }
 
@@ -302,6 +319,10 @@ function init() {
     document.addEventListener('touchstart', handleTouchStart, { passive: false });
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
+
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('gesturechange', (e) => e.preventDefault());
+    document.addEventListener('gestureend', (e) => e.preventDefault());
 
     setInterval(() => {
         updateAllTrackTimes(state.tracks);

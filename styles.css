@@ -104,6 +104,7 @@ h1 {
     flex-direction: column;
     gap: 15px;
     position: relative;
+    touch-action: none;
 }
 
 .track {
