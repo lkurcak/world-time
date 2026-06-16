@@ -160,7 +160,7 @@ function handleMouseMove(e) {
         const width = getTrackWidth();
         if (width === 0) return;
         const hoursPerPixel = (2 * state.zoom) / width;
-        setScrollOffset(state.dragStart.scrollOffset - dx * hoursPerPixel);
+        setScrollOffset(state.dragStart.scrollOffset + dx * hoursPerPixel);
         return;
     }
 
@@ -247,7 +247,7 @@ function handleWheel(e) {
             const width = getTrackWidth();
             if (width === 0) return;
             const hoursPerPixel = (2 * state.zoom) / width;
-            setScrollOffset(state.scrollOffset - e.deltaX * hoursPerPixel);
+            setScrollOffset(state.scrollOffset + e.deltaX * hoursPerPixel);
         } else {
             e.preventDefault();
             const zoomFactor = Math.exp(-e.deltaY * 0.001);
@@ -276,7 +276,7 @@ function handleTouchMove(e) {
         const width = getTrackWidth();
         if (width === 0) return;
         const hoursPerPixel = (2 * state.zoom) / width;
-        setScrollOffset(state.dragStart.scrollOffset - dx * hoursPerPixel);
+        setScrollOffset(state.dragStart.scrollOffset + dx * hoursPerPixel);
     } else if (e.touches.length === 2 && state.pinchStartDistance) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
