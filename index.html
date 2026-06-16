@@ -15,11 +15,7 @@
                 <datalist id="timezone-list"></datalist>
                 <button id="add-btn">Add</button>
             </div>
-            <div class="scale-controls" id="scale-controls">
-                <button class="scale-btn active" data-scale="12">±12h</button>
-                <button class="scale-btn" data-scale="6">±6h</button>
-                <button class="scale-btn" data-scale="3">±3h</button>
-            </div>
+            <button id="reset-btn" class="reset-btn">Reset to now</button>
         </header>
 
         <div id="tracks-container" class="tracks-container">
@@ -34,6 +30,9 @@
     </div>
     <div id="now-line" class="now-line">
         <div class="line-offset-label now-label">NOW</div>
+    </div>
+    <div id="now-indicator" class="now-indicator">
+        <span class="now-indicator-arrow">◀</span>
     </div>
 
     <script type="module" src="js/script.js"></script>

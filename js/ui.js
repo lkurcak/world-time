@@ -138,27 +138,27 @@ export function populateTimezoneList(datalist, timezones) {
     });
 }
 
-function computeTimeAtX(track, x, scale = 12) {
+export function computeTimeAtX(track, x, zoom, scrollOffset) {
     const timezone = track.dataset.timezone;
     const timeline = track.querySelector('.track-timeline');
     const timelineRect = timeline.getBoundingClientRect();
     const relativeX = x - timelineRect.left;
     const relativeXFraction = relativeX / timelineRect.width;
-    const offsetHours = (relativeXFraction - 0.5) * (2 * scale);
-    const offsetMs = offsetHours * 3600 * 1000;
+    const hours = scrollOffset + (relativeXFraction - 0.5) * (2 * zoom);
+    const offsetMs = hours * 3600 * 1000;
     const targetTime = new Date(Date.now() + offsetMs);
     const offsetStr = formatOffset(offsetMs);
     return { relativeX, timeStr: formatTime(timezone, targetTime), dayStr: getDayIndicator(timezone, targetTime), offsetStr };
 }
 
-export function showCursorLine(x, tracks, containerRect, scale = 12) {
+export function showCursorLine(x, tracks, zoom, scrollOffset) {
     const cursorLine = document.getElementById('cursor-line');
     cursorLine.style.left = x + 'px';
     cursorLine.classList.add('active');
 
     let firstOffsetStr = '';
     tracks.forEach(track => {
-        const { relativeX, timeStr, dayStr, offsetStr } = computeTimeAtX(track, x, scale);
+        const { relativeX, timeStr, dayStr, offsetStr } = computeTimeAtX(track, x, zoom, scrollOffset);
         if (!firstOffsetStr) firstOffsetStr = offsetStr;
         const display = track.querySelector('.cursor-display');
         display.querySelector('.time-part').textContent = timeStr;
@@ -190,15 +190,25 @@ export function hideCursorLine(tracks) {
     }
 }
 
-export function persistLine(x, tracks, containerRect, scale = 12) {
+export function persistLine(hours, tracks, zoom, scrollOffset) {
     const persistedLine = document.getElementById('persisted-line');
+    const firstTrack = tracks[0];
+    if (!firstTrack) {
+        persistedLine.classList.add('hidden');
+        persistedLine.classList.remove('active');
+        return;
+    }
+    const timeline = firstTrack.querySelector('.track-timeline');
+    const timelineRect = timeline.getBoundingClientRect();
+    const x = timelineRect.left + timelineRect.width * (0.5 + (hours - scrollOffset) / (2 * zoom));
+
     persistedLine.style.left = x + 'px';
     persistedLine.classList.remove('hidden');
     persistedLine.classList.add('active');
 
     let firstOffsetStr = '';
     tracks.forEach(track => {
-        const { relativeX, timeStr, dayStr, offsetStr } = computeTimeAtX(track, x, scale);
+        const { relativeX, timeStr, dayStr, offsetStr } = computeTimeAtX(track, x, zoom, scrollOffset);
         if (!firstOffsetStr) firstOffsetStr = offsetStr;
         const display = track.querySelector('.persisted-display');
         display.querySelector('.time-part').textContent = timeStr;
@@ -231,23 +241,23 @@ export function clearPersistedLine(tracks) {
     }
 }
 
-export function updateNowLabels(tracks) {
+export function updateNowLabels(tracks, zoom, scrollOffset) {
     tracks.forEach(track => {
         const timezone = track.dataset.timezone;
         const display = track.querySelector('.now-display');
         const timeline = track.querySelector('.track-timeline');
         const timelineRect = timeline.getBoundingClientRect();
-        const centerX = timelineRect.width / 2;
+        const relativeX = timelineRect.width * (0.5 + (0 - scrollOffset) / (2 * zoom));
         const timeStr = formatTime(timezone);
         const dayStr = getDayIndicator(timezone);
         display.querySelector('.time-part').textContent = timeStr;
         display.querySelector('.date-part').textContent = dayStr;
-        display.style.left = centerX + 'px';
+        display.style.left = relativeX + 'px';
         display.style.display = 'flex';
     });
 }
 
-export function updateNowLines(tracks, scale = 12) {
+export function updateNowLines(tracks, zoom, scrollOffset) {
     tracks.forEach(track => {
         const timezone = track.dataset.timezone;
         const now = new Date();
@@ -271,10 +281,10 @@ export function updateNowLines(tracks, scale = 12) {
             if (offset <= -12) offset += 24;
             if (offset > 12) offset -= 24;
 
-            const position = 50 + offset * (100 / (2 * scale));
+            const position = 50 + (offset - scrollOffset) * (100 / (2 * zoom));
             marker.style.left = position + '%';
 
-            if (offset > -scale && offset <= scale) {
+            if (position > -10 && position < 110) {
                 marker.style.display = 'block';
             } else {
                 marker.style.display = 'none';
@@ -288,15 +298,34 @@ export function updateNowLines(tracks, scale = 12) {
     });
 }
 
-export function positionNowLine(tracks) {
+export function positionNowLine(tracks, zoom, scrollOffset) {
     const nowLine = document.getElementById('now-line');
+    const nowIndicator = document.getElementById('now-indicator');
     if (tracks.length === 0) {
         nowLine.style.display = 'none';
+        nowIndicator.style.display = 'none';
         return;
     }
     const firstTrack = tracks[0];
-    const trackRect = firstTrack.getBoundingClientRect();
-    const centerX = trackRect.left + trackRect.width / 2;
-    nowLine.style.left = centerX + 'px';
-    nowLine.style.display = 'block';
+    const timeline = firstTrack.querySelector('.track-timeline');
+    const timelineRect = timeline.getBoundingClientRect();
+
+    const x = timelineRect.left + timelineRect.width * (0.5 + (0 - scrollOffset) / (2 * zoom));
+
+    if (x >= timelineRect.left && x <= timelineRect.right) {
+        nowLine.style.display = 'block';
+        nowLine.style.left = x + 'px';
+        nowIndicator.style.display = 'none';
+    } else {
+        nowLine.style.display = 'none';
+        nowIndicator.style.display = 'block';
+        const arrow = nowIndicator.querySelector('.now-indicator-arrow');
+        if (x < timelineRect.left) {
+            nowIndicator.style.left = timelineRect.left + 'px';
+            if (arrow) arrow.textContent = '◀';
+        } else {
+            nowIndicator.style.left = timelineRect.right + 'px';
+            if (arrow) arrow.textContent = '▶';
+        }
+    }
 }

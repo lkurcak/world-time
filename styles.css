@@ -52,30 +52,20 @@ h1 {
     flex-wrap: wrap;
 }
 
-.scale-controls {
-    display: flex;
-    gap: 5px;
-}
-
-.scale-btn {
-    padding: 5px 12px;
-    border: 2px solid var(--accent-color);
-    border-radius: 6px;
-    background: var(--track-bg);
-    color: #fff;
-    font-size: 0.8rem;
+.reset-btn {
+    padding: 10px 20px;
+    border: 2px solid #00d9ff;
+    border-radius: 8px;
+    background: transparent;
+    color: #00d9ff;
+    font-size: 1rem;
     cursor: pointer;
     transition: all 0.3s;
 }
 
-.scale-btn:hover {
-    border-color: var(--text-color);
-}
-
-.scale-btn.active {
-    background: var(--text-color);
-    border-color: var(--text-color);
-    color: #fff;
+.reset-btn:hover {
+    background: #00d9ff;
+    color: var(--bg-color);
 }
 
 #timezone-input {
@@ -253,6 +243,21 @@ h1 {
     transform: translateX(-50%);
     pointer-events: none;
     display: none;
+}
+
+.now-indicator {
+    position: fixed;
+    top: 5px;
+    z-index: 95;
+    pointer-events: none;
+    display: none;
+    transform: translateX(-50%);
+    font-size: 0.75rem;
+    color: #00d9ff;
+    font-weight: bold;
+    padding: 4px 8px;
+    background: var(--bg-color);
+    border-radius: 4px;
 }
 
 .track-time-display {
