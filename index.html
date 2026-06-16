@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Time Converter</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>World Time</h1>
+            <div class="add-timezone">
+                <input type="text" id="timezone-input" placeholder="Add timezone (e.g. America/New_York)" list="timezone-list">
+                <datalist id="timezone-list"></datalist>
+                <button id="add-btn">Add</button>
+            </div>
+            <div class="scale-controls" id="scale-controls">
+                <button class="scale-btn active" data-scale="12">±12h</button>
+                <button class="scale-btn" data-scale="6">±6h</button>
+                <button class="scale-btn" data-scale="3">±3h</button>
+            </div>
+        </header>
+
+        <div id="tracks-container" class="tracks-container">
+        </div>
+    </div>
+
+    <div id="cursor-line" class="cursor-line">
+        <div id="cursor-label" class="line-offset-label cursor-label"></div>
+    </div>
+    <div id="persisted-line" class="persisted-line hidden">
+        <div id="persisted-label" class="line-offset-label persisted-label"></div>
+    </div>
+    <div id="now-line" class="now-line">
+        <div class="line-offset-label now-label">NOW</div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+:root {
+    --bg-color: #1a1a2e;
+    --surface-color: #16213e;
+    --text-color: #e94560;
+    --accent-color: #0f3460;
+    --line-color: #e94560;
+    --line-hover-color: rgba(233, 69, 96, 0.5);
+    --track-bg: #0f3460;
+    --track-hover: #1a4a7a;
+    --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: crosshair;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+h1 {
+    font-size: 2rem;
+    color: var(--text-color);
+    letter-spacing: 2px;
+}
+
+.add-timezone {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.scale-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.scale-btn {
+    padding: 5px 12px;
+    border: 2px solid var(--accent-color);
+    border-radius: 6px;
+    background: var(--track-bg);
+    color: #fff;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.scale-btn:hover {
+    border-color: var(--text-color);
+}
+
+.scale-btn.active {
+    background: var(--text-color);
+    border-color: var(--text-color);
+    color: #fff;
+}
+
+#timezone-input {
+    padding: 10px 15px;
+    border: 2px solid var(--accent-color);
+    border-radius: 8px;
+    background: var(--surface-color);
+    color: #fff;
+    font-size: 1rem;
+    min-width: 300px;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+#timezone-input:focus {
+    border-color: var(--text-color);
+}
+
+#add-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: var(--text-color);
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: opacity 0.3s;
+}
+
+#add-btn:hover {
+    opacity: 0.8;
+}
+
+.tracks-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    position: relative;
+}
+
+.track {
+    background: var(--track-bg);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    min-height: 100px;
+    transition: background 0.3s;
+}
+
+.track:hover {
+    background: var(--track-hover);
+}
+
+.track-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.track-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.track-name {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #fff;
+}
+
+.track-time {
+    font-size: 1rem;
+    color: var(--text-color);
+    font-variant-numeric: tabular-nums;
+}
+
+.remove-btn {
+    background: transparent;
+    border: 2px solid var(--text-color);
+    color: var(--text-color);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.3s;
+}
+
+.remove-btn:hover {
+    background: var(--text-color);
+    color: #fff;
+}
+
+.track-timeline {
+    position: relative;
+    height: 60px;
+    overflow: hidden;
+    border-top: 2px solid var(--accent-color);
+    margin-top: 10px;
+}
+
+.hours-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.hour-marker {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: var(--accent-color);
+    transform: translateX(-50%);
+}
+
+.hour-marker .hour-number {
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.75rem;
+    color: #fff;
+    white-space: nowrap;
+}
+
+.hour-marker.current-hour {
+    width: 2px;
+    background: var(--text-color);
+}
+
+.hour-marker.current-hour .hour-number {
+    color: var(--text-color);
+    font-weight: bold;
+}
+
+.cursor-line, .persisted-line {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    pointer-events: none;
+    z-index: 100;
+    transform: translateX(-50%);
+}
+
+.cursor-line {
+    background: var(--line-hover-color);
+    display: none;
+}
+
+.persisted-line {
+    background: var(--line-color);
+}
+
+.persisted-line.hidden {
+    display: none;
+}
+
+.now-line {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #00d9ff;
+    z-index: 90;
+    transform: translateX(-50%);
+    pointer-events: none;
+    display: none;
+}
+
+.track-time-display {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-color);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    z-index: 110;
+    pointer-events: none;
+    display: none;
+    border: 2px solid;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.track-time-display .time-part {
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.track-time-display .date-part {
+    font-size: 0.65rem;
+    color: #888;
+    white-space: nowrap;
+}
+
+.track-time-display.now-display {
+    border-color: #00d9ff;
+    color: #00d9ff;
+}
+
+.track-time-display.cursor-display {
+    border-color: var(--line-hover-color);
+    background: var(--bg-color);
+}
+
+.track-time-display.persisted-display {
+    border-color: var(--line-color);
+    background: var(--bg-color);
+}
+
+.line-offset-label {
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
+.cursor-label {
+    background: var(--line-hover-color);
+    color: #fff;
+}
+
+.persisted-label {
+    background: var(--line-color);
+    color: #fff;
+}
+
+.now-label {
+    background: #00d9ff;
+    color: #fff;
+}
+
+.cursor-line.active, .persisted-line.active {
+    display: block;
+}
+
+.day-indicator {
+    font-size: 0.75rem;
+    color: #888;
+    margin-left: 8px;
+}
+
+@media (max-width: 600px) {
+    header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    #timezone-input {
+        min-width: 200px;
+    }
+
+    .track-name {
+        font-size: 1rem;
+    }
+
+    .track-time {
+        font-size: 0.85rem;
+    }
+}
