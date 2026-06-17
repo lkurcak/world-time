@@ -15,6 +15,7 @@ import {
     updateNowLines,
     positionNowLine,
     updateNowLabels,
+    snapXToMinute,
 } from './ui.js';
 
 const state = {
@@ -308,7 +309,8 @@ function handleClick(e) {
         return;
     }
 
-    const hours = pixelToHours(e.clientX);
+    const snapX = snapXToMinute(e.clientX, state.tracks, state.zoom, state.scrollOffset);
+    const hours = pixelToHours(snapX);
     const targetAt = Math.round((Date.now() / 60000) + hours * 60);
     
     const existingIndex = state.persists.findIndex(p => Math.abs(p.at - targetAt) <= 1);

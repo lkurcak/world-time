@@ -146,21 +146,23 @@ export function computeTimeAtX(track, x, zoom, scrollOffset) {
     return { relativeX, timeStr: formatTime(timezone, targetTime), dayStr: getDayIndicator(timezone, targetTime), offsetStr };
 }
 
-export function showCursorLine(x, tracks, zoom, scrollOffset) {
-    // Snap cursor to nearest minute boundary
+export function snapXToMinute(x, tracks, zoom, scrollOffset) {
+    if (tracks.length === 0) return x;
     const firstTrack = tracks[0];
-    if (firstTrack) {
-        const timeline = firstTrack.querySelector('.track-timeline');
-        const rect = timeline.getBoundingClientRect();
-        const relativeX = x - rect.left;
-        const fraction = relativeX / rect.width;
-        const hours = scrollOffset + (fraction - 0.5) * (2 * zoom);
-        const offsetMs = hours * 3600 * 1000;
-        const roundedOffsetMs = Math.round(offsetMs / 60000) * 60000;
-        const roundedHours = roundedOffsetMs / 3600000;
-        const roundedFraction = (roundedHours - scrollOffset) / (2 * zoom) + 0.5;
-        x = rect.left + roundedFraction * rect.width;
-    }
+    const timeline = firstTrack.querySelector('.track-timeline');
+    const rect = timeline.getBoundingClientRect();
+    const relativeX = x - rect.left;
+    const fraction = relativeX / rect.width;
+    const hours = scrollOffset + (fraction - 0.5) * (2 * zoom);
+    const offsetMs = hours * 3600 * 1000;
+    const roundedOffsetMs = Math.round(offsetMs / 60000) * 60000;
+    const roundedHours = roundedOffsetMs / 3600000;
+    const roundedFraction = (roundedHours - scrollOffset) / (2 * zoom) + 0.5;
+    return rect.left + roundedFraction * rect.width;
+}
+
+export function showCursorLine(x, tracks, zoom, scrollOffset) {
+    x = snapXToMinute(x, tracks, zoom, scrollOffset);
 
     const cursorLine = document.getElementById('cursor-line');
     cursorLine.style.left = x + 'px';
