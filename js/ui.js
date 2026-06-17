@@ -147,6 +147,21 @@ export function computeTimeAtX(track, x, zoom, scrollOffset) {
 }
 
 export function showCursorLine(x, tracks, zoom, scrollOffset) {
+    // Snap cursor to nearest minute boundary
+    const firstTrack = tracks[0];
+    if (firstTrack) {
+        const timeline = firstTrack.querySelector('.track-timeline');
+        const rect = timeline.getBoundingClientRect();
+        const relativeX = x - rect.left;
+        const fraction = relativeX / rect.width;
+        const hours = scrollOffset + (fraction - 0.5) * (2 * zoom);
+        const offsetMs = hours * 3600 * 1000;
+        const roundedOffsetMs = Math.round(offsetMs / 60000) * 60000;
+        const roundedHours = roundedOffsetMs / 3600000;
+        const roundedFraction = (roundedHours - scrollOffset) / (2 * zoom) + 0.5;
+        x = rect.left + roundedFraction * rect.width;
+    }
+
     const cursorLine = document.getElementById('cursor-line');
     cursorLine.style.left = x + 'px';
     cursorLine.classList.add('active');
