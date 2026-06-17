@@ -11,8 +11,7 @@ import {
     populateTimezoneList,
     showCursorLine,
     hideCursorLine,
-    persistLine,
-    clearPersistedLine,
+    renderPersists,
     updateNowLines,
     positionNowLine,
     updateNowLabels,
@@ -21,7 +20,7 @@ import {
 const state = {
     timezones: [],
     tracks: [],
-    persistedHours: null,
+    persists: [],
     zoom: 12,
     scrollOffset: 0,
     isDragging: false,
@@ -44,9 +43,10 @@ function serializeState() {
     state.timezones.forEach(tz => params.append('tz', tz));
     params.set('zoom', Math.round(state.zoom * 100) / 100);
     params.set('offset', Math.round(state.scrollOffset * 100) / 100);
-    if (state.persistedHours !== null) {
-        params.set('persist', Math.round(state.persistedHours * 100) / 100);
-    }
+    state.persists.forEach(p => {
+        const entry = p.at + (p.label ? ':' + p.label : '');
+        params.append('at', entry);
+    });
     return params.toString();
 }
 
@@ -56,8 +56,24 @@ function deserializeState(search) {
     if (timezones.length === 0) return null;
     const zoom = parseFloat(params.get('zoom')) || 12;
     const offset = parseFloat(params.get('offset')) || 0;
-    const persist = params.has('persist') ? parseFloat(params.get('persist')) : null;
-    return { timezones, zoom, offset, persist };
+    
+    let persists = [];
+    const atEntries = params.getAll('at');
+    if (atEntries.length > 0) {
+        persists = atEntries.map(entry => {
+            const [atStr, ...labelParts] = entry.split(':');
+            const at = parseInt(atStr);
+            const label = labelParts.join(':') || '';
+            return { at, label };
+        });
+    } else if (params.has('persist')) {
+        const val = parseFloat(params.get('persist'));
+        // Old relative hours (< 1e9) or old absolute ms timestamps
+        const ms = Math.abs(val) < 1e9 ? Date.now() + val * 3600000 : val;
+        persists = [{ at: Math.round(ms / 60000), label: '' }];
+    }
+    
+    return { timezones, zoom, offset, persists };
 }
 
 function saveState() {
@@ -65,7 +81,7 @@ function saveState() {
         timezones: state.timezones,
         zoom: state.zoom,
         scrollOffset: state.scrollOffset,
-        persistedHours: state.persistedHours,
+        persists: state.persists,
     };
     localStorage.setItem(LS_KEY, JSON.stringify(data));
 }
@@ -74,7 +90,22 @@ function loadState() {
     try {
         const raw = localStorage.getItem(LS_KEY);
         if (!raw) return null;
-        return JSON.parse(raw);
+        const data = JSON.parse(raw);
+        
+        // Migrate old persistedHours / persistedTimestamp to persists array
+        if (data.persists === undefined) {
+            let at = null;
+            if (data.persistedTimestamp !== undefined) {
+                at = Math.round(data.persistedTimestamp / 60000);
+            } else if (data.persistedHours !== undefined) {
+                at = Math.round((Date.now() + data.persistedHours * 3600000) / 60000);
+            }
+            data.persists = at !== null ? [{ at, label: '' }] : [];
+            delete data.persistedHours;
+            delete data.persistedTimestamp;
+        }
+        
+        return data;
     } catch {
         return null;
     }
@@ -153,8 +184,7 @@ function setScrollOffset(newScrollOffset) {
 function resetView() {
     state.zoom = 12;
     state.scrollOffset = 0;
-    state.persistedHours = null;
-    clearPersistedLine(state.tracks);
+    state.persists = [];
     renderAll();
     saveState();
 }
@@ -163,9 +193,7 @@ function renderAll() {
     updateNowLines(state.tracks, state.zoom, state.scrollOffset);
     updateNowLabels(state.tracks, state.zoom, state.scrollOffset);
     positionNowLine(state.tracks, state.zoom, state.scrollOffset);
-    if (state.persistedHours !== null) {
-        persistLine(state.persistedHours, state.tracks, state.zoom, state.scrollOffset);
-    }
+    renderPersists(state.persists, state.tracks, state.zoom, state.scrollOffset);
 }
 
 function addTimezone(timezone) {
@@ -194,8 +222,7 @@ function removeTimezone(timezone) {
     track.remove();
 
     if (state.timezones.length === 0) {
-        clearPersistedLine([]);
-        state.persistedHours = null;
+        state.persists = [];
     }
     renderAll();
     saveState();
@@ -282,13 +309,18 @@ function handleClick(e) {
     }
 
     const hours = pixelToHours(e.clientX);
-    if (state.persistedHours !== null && Math.abs(state.persistedHours - hours) < 0.01) {
-        clearPersistedLine(state.tracks);
-        state.persistedHours = null;
+    const targetAt = Math.round((Date.now() / 60000) + hours * 60);
+    
+    const existingIndex = state.persists.findIndex(p => Math.abs(p.at - targetAt) <= 1);
+    if (existingIndex !== -1) {
+        state.persists.splice(existingIndex, 1);
     } else {
-        state.persistedHours = hours;
-        persistLine(state.persistedHours, state.tracks, state.zoom, state.scrollOffset);
+        const label = prompt('Label for this time marker (optional):');
+        if (label !== null) {
+            state.persists.push({ at: targetAt, label: label.trim() });
+        }
     }
+    renderAll();
     saveState();
 }
 
@@ -376,7 +408,7 @@ function init() {
     if (urlState) {
         state.zoom = urlState.zoom;
         state.scrollOffset = urlState.offset;
-        state.persistedHours = urlState.persist;
+        state.persists = urlState.persists;
         urlState.timezones.forEach(tz => addTimezone(tz));
         clearUrlParams();
     } else {
@@ -384,7 +416,7 @@ function init() {
         if (saved) {
             state.zoom = saved.zoom;
             state.scrollOffset = saved.scrollOffset;
-            state.persistedHours = saved.persistedHours;
+            state.persists = saved.persists;
             saved.timezones.forEach(tz => addTimezone(tz));
         } else {
             addTimezone(getLocalTimezone());
