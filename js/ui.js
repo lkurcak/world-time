@@ -224,6 +224,12 @@ export function renderPersists(persists, tracks, zoom, scrollOffset) {
             lineEl.className = 'persisted-line';
             const label = document.createElement('div');
             label.className = 'line-offset-label persisted-label';
+            const labelText = document.createElement('span');
+            labelText.className = 'persist-label-text';
+            label.appendChild(labelText);
+            const offsetText = document.createElement('span');
+            offsetText.className = 'persist-offset-text';
+            label.appendChild(offsetText);
             lineEl.appendChild(label);
             document.body.appendChild(lineEl);
         }
@@ -232,7 +238,8 @@ export function renderPersists(persists, tracks, zoom, scrollOffset) {
 
         const offsetMs = persist.at * 60000 - Date.now();
         const offsetStr = formatOffset(offsetMs);
-        lineEl.querySelector('.persisted-label').textContent = persist.label ? persist.label + '\n' + offsetStr : offsetStr;
+        lineEl.querySelector('.persist-label-text').textContent = persist.label || '';
+        lineEl.querySelector('.persist-offset-text').textContent = offsetStr;
 
         // Track displays
         tracks.forEach(track => {
