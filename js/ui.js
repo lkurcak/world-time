@@ -224,12 +224,12 @@ export function renderPersists(persists, tracks, zoom, scrollOffset) {
             lineEl.className = 'persisted-line';
             const label = document.createElement('div');
             label.className = 'line-offset-label persisted-label';
-            const labelText = document.createElement('span');
-            labelText.className = 'persist-label-text';
-            label.appendChild(labelText);
             const offsetText = document.createElement('span');
             offsetText.className = 'persist-offset-text';
             label.appendChild(offsetText);
+            const labelText = document.createElement('span');
+            labelText.className = 'persist-label-text';
+            label.appendChild(labelText);
             lineEl.appendChild(label);
             document.body.appendChild(lineEl);
         }
