@@ -232,7 +232,7 @@ export function renderPersists(persists, tracks, zoom, scrollOffset) {
 
         const offsetMs = persist.at * 60000 - Date.now();
         const offsetStr = formatOffset(offsetMs);
-        lineEl.querySelector('.persisted-label').textContent = persist.label || offsetStr;
+        lineEl.querySelector('.persisted-label').textContent = persist.label ? persist.label + '\n' + offsetStr : offsetStr;
 
         // Track displays
         tracks.forEach(track => {
