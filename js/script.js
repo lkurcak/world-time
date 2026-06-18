@@ -11,7 +11,7 @@ import {
     populateTimezoneList,
     showCursorLine,
     hideCursorLine,
-    renderPersists,
+    renderEvents,
     updateNowLines,
     positionNowLine,
     updateNowLabels,
@@ -21,7 +21,7 @@ import {
 const state = {
     timezones: [],
     tracks: [],
-    persists: [],
+    events: [],
     zoom: 12,
     scrollOffset: 0,
     isDragging: false,
@@ -36,17 +36,131 @@ const timezoneList = document.getElementById('timezone-list');
 const resetBtn = document.getElementById('reset-btn');
 const shareBtn = document.getElementById('share-btn');
 
+// Modal elements
+const eventModal = document.getElementById('event-modal');
+const modalTitle = document.getElementById('modal-title');
+const modalLabel = document.getElementById('modal-label');
+const modalTz = document.getElementById('modal-tz');
+const modalRecurrence = document.getElementById('modal-recurrence');
+const modalSave = document.getElementById('modal-save');
+const modalDelete = document.getElementById('modal-delete');
+const modalCancel = document.getElementById('modal-cancel');
+
 const allTimezones = getAllTimezones();
 const LS_KEY = 'world-time-state';
+
+// ─── Modal state ─────────────────────────────────────────────────────────────
+
+let modalMode = 'create'; // 'create' | 'edit'
+let modalPendingAt = null; // epoch minutes for new event
+let modalEditId = null;    // id of event being edited
+
+function buildModalTzOptions(defaultTz) {
+    modalTz.innerHTML = '';
+    // Tracks first (deduplicated), then remaining COMMON_TIMEZONES
+    const trackTzs = state.timezones;
+    const remaining = COMMON_TIMEZONES.filter(tz => !trackTzs.includes(tz));
+    const ordered = [...trackTzs, ...remaining];
+
+    ordered.forEach(tz => {
+        const opt = document.createElement('option');
+        opt.value = tz;
+        opt.textContent = tz;
+        if (tz === defaultTz) opt.selected = true;
+        modalTz.appendChild(opt);
+    });
+
+    // If defaultTz isn't in the list yet, prepend it
+    if (defaultTz && !ordered.includes(defaultTz)) {
+        const opt = document.createElement('option');
+        opt.value = defaultTz;
+        opt.textContent = defaultTz;
+        opt.selected = true;
+        modalTz.insertBefore(opt, modalTz.firstChild);
+    }
+}
+
+function openModalCreate(epochMinutes, defaultTz) {
+    modalMode = 'create';
+    modalPendingAt = epochMinutes;
+    modalEditId = null;
+    modalTitle.textContent = 'New Event';
+    modalLabel.value = '';
+    modalRecurrence.value = '';
+    buildModalTzOptions(defaultTz || getLocalTimezone());
+    modalDelete.style.display = 'none';
+    eventModal.classList.add('active');
+    modalLabel.focus();
+}
+
+function openModalEdit(event) {
+    modalMode = 'edit';
+    modalPendingAt = null;
+    modalEditId = event.id;
+    modalTitle.textContent = 'Edit Event';
+    modalLabel.value = event.label || '';
+    modalRecurrence.value = event.recurrence || '';
+    buildModalTzOptions(event.tz);
+    modalDelete.style.display = '';
+    eventModal.classList.add('active');
+    modalLabel.focus();
+}
+
+function closeModal() {
+    eventModal.classList.remove('active');
+    modalMode = 'create';
+    modalPendingAt = null;
+    modalEditId = null;
+}
+
+function handleModalSave() {
+    const label = modalLabel.value.trim();
+    const tz = modalTz.value;
+    const recurrence = modalRecurrence.value || null;
+
+    if (modalMode === 'create') {
+        const event = {
+            id: crypto.randomUUID(),
+            at: modalPendingAt,
+            label,
+            tz,
+            recurrence,
+        };
+        state.events.push(event);
+    } else {
+        const idx = state.events.findIndex(e => e.id === modalEditId);
+        if (idx !== -1) {
+            state.events[idx] = { ...state.events[idx], label, tz, recurrence };
+        }
+    }
+
+    closeModal();
+    renderAll();
+    saveState();
+}
+
+function handleModalDelete() {
+    if (modalEditId) {
+        state.events = state.events.filter(e => e.id !== modalEditId);
+    }
+    closeModal();
+    renderAll();
+    saveState();
+}
+
+// ─── Serialization ────────────────────────────────────────────────────────────
 
 function serializeState() {
     const params = new URLSearchParams();
     state.timezones.forEach(tz => params.append('tz', tz));
     params.set('zoom', Math.round(state.zoom * 100) / 100);
     params.set('offset', Math.round(state.scrollOffset * 100) / 100);
-    state.persists.forEach(p => {
-        const entry = p.at + (p.label ? ':' + p.label : '');
-        params.append('at', entry);
+    // Only serialize simple (non-recurring) events to URL for backwards compat
+    state.events.forEach(ev => {
+        if (!ev.recurrence) {
+            const entry = ev.at + (ev.label ? ':' + ev.label : '');
+            params.append('at', entry);
+        }
     });
     return params.toString();
 }
@@ -57,24 +171,35 @@ function deserializeState(search) {
     if (timezones.length === 0) return null;
     const zoom = parseFloat(params.get('zoom')) || 12;
     const offset = parseFloat(params.get('offset')) || 0;
-    
-    let persists = [];
+
+    let events = [];
     const atEntries = params.getAll('at');
     if (atEntries.length > 0) {
-        persists = atEntries.map(entry => {
+        events = atEntries.map(entry => {
             const [atStr, ...labelParts] = entry.split(':');
             const at = parseInt(atStr);
             const label = labelParts.join(':') || '';
-            return { at, label };
+            return {
+                id: crypto.randomUUID(),
+                at,
+                label,
+                tz: getLocalTimezone(),
+                recurrence: null,
+            };
         });
     } else if (params.has('persist')) {
         const val = parseFloat(params.get('persist'));
-        // Old relative hours (< 1e9) or old absolute ms timestamps
         const ms = Math.abs(val) < 1e9 ? Date.now() + val * 3600000 : val;
-        persists = [{ at: Math.round(ms / 60000), label: '' }];
+        events = [{
+            id: crypto.randomUUID(),
+            at: Math.round(ms / 60000),
+            label: '',
+            tz: getLocalTimezone(),
+            recurrence: null,
+        }];
     }
-    
-    return { timezones, zoom, offset, persists };
+
+    return { timezones, zoom, offset, events };
 }
 
 function saveState() {
@@ -82,7 +207,7 @@ function saveState() {
         timezones: state.timezones,
         zoom: state.zoom,
         scrollOffset: state.scrollOffset,
-        persists: state.persists,
+        events: state.events,
     };
     localStorage.setItem(LS_KEY, JSON.stringify(data));
 }
@@ -92,25 +217,45 @@ function loadState() {
         const raw = localStorage.getItem(LS_KEY);
         if (!raw) return null;
         const data = JSON.parse(raw);
-        
-        // Migrate old persistedHours / persistedTimestamp to persists array
-        if (data.persists === undefined) {
+
+        // Migrate old persistedHours / persistedTimestamp
+        if (data.persists === undefined && data.events === undefined) {
             let at = null;
             if (data.persistedTimestamp !== undefined) {
                 at = Math.round(data.persistedTimestamp / 60000);
             } else if (data.persistedHours !== undefined) {
                 at = Math.round((Date.now() + data.persistedHours * 3600000) / 60000);
             }
-            data.persists = at !== null ? [{ at, label: '' }] : [];
+            data.events = at !== null ? [{
+                id: crypto.randomUUID(),
+                at,
+                label: '',
+                tz: getLocalTimezone(),
+                recurrence: null,
+            }] : [];
             delete data.persistedHours;
             delete data.persistedTimestamp;
         }
-        
+
+        // Migrate old persists array → events
+        if (data.persists !== undefined && data.events === undefined) {
+            data.events = data.persists.map(p => ({
+                id: crypto.randomUUID(),
+                at: p.at,
+                label: p.label || '',
+                tz: getLocalTimezone(),
+                recurrence: null,
+            }));
+            delete data.persists;
+        }
+
         return data;
     } catch {
         return null;
     }
 }
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 function clearUrlParams() {
     if (window.location.search) {
@@ -141,13 +286,6 @@ function getFirstTrackRect() {
 function getTrackWidth() {
     const rect = getFirstTrackRect();
     return rect ? rect.width : 0;
-}
-
-function hoursToPixel(hours) {
-    const rect = getFirstTrackRect();
-    if (!rect) return 0;
-    const fraction = 0.5 + (hours - state.scrollOffset) / (2 * state.zoom);
-    return rect.left + fraction * rect.width;
 }
 
 function pixelToHours(pixelX) {
@@ -185,7 +323,7 @@ function setScrollOffset(newScrollOffset) {
 function resetView() {
     state.zoom = 12;
     state.scrollOffset = 0;
-    state.persists = [];
+    state.events = [];
     renderAll();
     saveState();
 }
@@ -194,13 +332,13 @@ function renderAll() {
     updateNowLines(state.tracks, state.zoom, state.scrollOffset);
     updateNowLabels(state.tracks, state.zoom, state.scrollOffset);
     positionNowLine(state.tracks, state.zoom, state.scrollOffset);
-    renderPersists(state.persists, state.tracks, state.zoom, state.scrollOffset);
+    renderEvents(state.events, state.tracks, state.zoom, state.scrollOffset, openModalEdit);
 }
 
+// ─── Track management ─────────────────────────────────────────────────────────
+
 function addTimezone(timezone) {
-    if (state.timezones.includes(timezone)) {
-        return;
-    }
+    if (state.timezones.includes(timezone)) return;
 
     state.timezones.push(timezone);
     const track = createTrackElement(timezone, removeTimezone);
@@ -223,7 +361,7 @@ function removeTimezone(timezone) {
     track.remove();
 
     if (state.timezones.length === 0) {
-        state.persists = [];
+        state.events = [];
     }
     renderAll();
     saveState();
@@ -248,6 +386,8 @@ function handleAdd() {
         }
     }
 }
+
+// ─── Mouse / touch handlers ───────────────────────────────────────────────────
 
 function handleMouseMove(e) {
     state.lastMouseX = e.clientX;
@@ -274,9 +414,12 @@ function handleMouseMove(e) {
 }
 
 function handleMouseDown(e) {
-    if (e.target.closest('.remove-btn') || e.target.closest('button') || e.target.closest('input')) {
+    if (e.target.closest('.remove-btn') || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
         return;
     }
+    // Don't start drag on event label clicks (they open the modal)
+    if (e.target.closest('.persisted-label')) return;
+
     state.isDragging = true;
     state.dragStart = { x: e.clientX, scrollOffset: state.scrollOffset };
     document.body.style.cursor = 'grabbing';
@@ -305,25 +448,21 @@ function handleClick(e) {
         return;
     }
 
-    if (e.target.closest('.remove-btn')) {
-        return;
-    }
+    if (e.target.closest('.remove-btn')) return;
+    // Clicks on persisted labels are handled by their own listener in ui.js
+    if (e.target.closest('.persisted-label')) return;
+
+    // Determine which track was clicked for default tz
+    const clickedTrack = e.target.closest('.track');
+    const defaultTz = clickedTrack
+        ? clickedTrack.dataset.timezone
+        : (state.timezones[0] || getLocalTimezone());
 
     const snapX = snapXToMinute(e.clientX, state.tracks, state.zoom, state.scrollOffset);
     const hours = pixelToHours(snapX);
     const targetAt = Math.round((Date.now() / 60000) + hours * 60);
-    
-    const existingIndex = state.persists.findIndex(p => Math.abs(p.at - targetAt) <= 1);
-    if (existingIndex !== -1) {
-        state.persists.splice(existingIndex, 1);
-    } else {
-        const label = prompt('Label for this time marker (optional):');
-        if (label !== null) {
-            state.persists.push({ at: targetAt, label: label.trim() });
-        }
-    }
-    renderAll();
-    saveState();
+
+    openModalCreate(targetAt, defaultTz);
 }
 
 function handleWheel(e) {
@@ -403,6 +542,8 @@ function handleTouchEnd(e) {
     }
 }
 
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
 function init() {
     populateTimezoneList(timezoneList, COMMON_TIMEZONES);
 
@@ -410,7 +551,7 @@ function init() {
     if (urlState) {
         state.zoom = urlState.zoom;
         state.scrollOffset = urlState.offset;
-        state.persists = urlState.persists;
+        state.events = urlState.events;
         urlState.timezones.forEach(tz => addTimezone(tz));
         clearUrlParams();
     } else {
@@ -418,7 +559,7 @@ function init() {
         if (saved) {
             state.zoom = saved.zoom;
             state.scrollOffset = saved.scrollOffset;
-            state.persists = saved.persists;
+            state.events = saved.events || [];
             saved.timezones.forEach(tz => addTimezone(tz));
         } else {
             addTimezone(getLocalTimezone());
@@ -427,12 +568,24 @@ function init() {
 
     addBtn.addEventListener('click', handleAdd);
     timezoneInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            handleAdd();
-        }
+        if (e.key === 'Enter') handleAdd();
     });
     resetBtn.addEventListener('click', resetView);
     shareBtn.addEventListener('click', handleShare);
+
+    // Modal buttons
+    modalSave.addEventListener('click', handleModalSave);
+    modalDelete.addEventListener('click', handleModalDelete);
+    modalCancel.addEventListener('click', closeModal);
+    eventModal.addEventListener('click', (e) => {
+        if (e.target === eventModal) closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && eventModal.classList.contains('active')) closeModal();
+        if (e.key === 'Enter' && eventModal.classList.contains('active') && e.target !== modalSave && e.target !== modalDelete && e.target !== modalCancel) {
+            handleModalSave();
+        }
+    });
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mousedown', handleMouseDown);

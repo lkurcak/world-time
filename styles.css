@@ -256,6 +256,23 @@ h1 {
     display: none;
 }
 
+/* Recurring event lines use a dashed style */
+.persisted-line--recurring {
+    background: repeating-linear-gradient(
+        to bottom,
+        var(--line-color) 0px,
+        var(--line-color) 6px,
+        transparent 6px,
+        transparent 12px
+    );
+}
+
+.persist-recur-icon {
+    font-size: 0.7rem;
+    opacity: 0.85;
+    line-height: 1;
+}
+
 .now-line {
     position: fixed;
     top: 0;
@@ -378,6 +395,126 @@ h1 {
     font-size: 0.75rem;
     color: #888;
     margin-left: 8px;
+}
+
+/* ─── Event modal ─────────────────────────────────────────────────────────── */
+
+.event-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+}
+
+.event-modal-overlay.active {
+    display: flex;
+}
+
+.event-modal {
+    background: var(--surface-color);
+    border: 2px solid var(--accent-color);
+    border-radius: 12px;
+    padding: 28px 32px;
+    min-width: 320px;
+    max-width: 420px;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.event-modal h2 {
+    font-size: 1.2rem;
+    color: #fff;
+    letter-spacing: 1px;
+    margin: 0;
+}
+
+.modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.modal-field label {
+    font-size: 0.8rem;
+    color: #888;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.modal-field input,
+.modal-field select {
+    padding: 8px 12px;
+    border: 2px solid var(--accent-color);
+    border-radius: 8px;
+    background: var(--bg-color);
+    color: #fff;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: var(--font-family);
+}
+
+.modal-field input:focus,
+.modal-field select:focus {
+    border-color: var(--text-color);
+}
+
+.modal-field select option {
+    background: var(--bg-color);
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.modal-btn {
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-family);
+}
+
+.modal-btn-save {
+    background: var(--text-color);
+    color: #fff;
+    border: 2px solid var(--text-color);
+}
+
+.modal-btn-save:hover {
+    opacity: 0.85;
+}
+
+.modal-btn-delete {
+    background: transparent;
+    color: #e74c3c;
+    border: 2px solid #e74c3c;
+}
+
+.modal-btn-delete:hover {
+    background: #e74c3c;
+    color: #fff;
+}
+
+.modal-btn-cancel {
+    background: transparent;
+    color: #888;
+    border: 2px solid #444;
+}
+
+.modal-btn-cancel:hover {
+    border-color: #888;
+    color: #fff;
 }
 
 @media (max-width: 600px) {

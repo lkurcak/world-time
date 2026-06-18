@@ -33,6 +33,36 @@
         <span class="now-indicator-arrow">◀</span>
     </div>
 
+    <!-- Event modal -->
+    <div id="event-modal" class="event-modal-overlay" aria-modal="true" role="dialog" aria-labelledby="modal-title">
+        <div class="event-modal">
+            <h2 id="modal-title">New Event</h2>
+            <div class="modal-field">
+                <label for="modal-label">Label</label>
+                <input id="modal-label" type="text" placeholder="optional" autocomplete="off">
+            </div>
+            <div class="modal-field">
+                <label for="modal-tz">Timezone</label>
+                <select id="modal-tz"></select>
+            </div>
+            <div class="modal-field">
+                <label for="modal-recurrence">Repeat</label>
+                <select id="modal-recurrence">
+                    <option value="">None</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekdays">Weekdays (Mon–Fri)</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+            </div>
+            <div class="modal-buttons">
+                <button id="modal-save" class="modal-btn modal-btn-save">Save</button>
+                <button id="modal-delete" class="modal-btn modal-btn-delete">Delete</button>
+                <button id="modal-cancel" class="modal-btn modal-btn-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="js/script.js"></script>
 </body>
 </html>

@@ -6,6 +6,8 @@ import {
     formatOffset,
 } from './timezones.js';
 
+import { getOccurrences } from './recurrence.js';
+
 export function createTrackElement(timezone, onRemove) {
     const track = document.createElement('div');
     track.className = 'track';
@@ -202,68 +204,114 @@ export function hideCursorLine(tracks) {
     }
 }
 
-export function renderPersists(persists, tracks, zoom, scrollOffset) {
-    const activeAts = new Set(persists.map(p => p.at));
+/**
+ * Render all events (including recurring occurrences) onto the timeline.
+ *
+ * Each occurrence gets a DOM id of the form:
+ *   persist-line-<eventId>-<occurrenceIndex>
+ *
+ * @param {Array} events
+ * @param {HTMLElement[]} tracks
+ * @param {number} zoom
+ * @param {number} scrollOffset
+ * @param {Function} onEventClick - called with the event object when a label is clicked
+ */
+export function renderEvents(events, tracks, zoom, scrollOffset, onEventClick) {
+    // Build the set of line IDs that should exist after this render
+    const firstTrack = tracks.length > 0 ? tracks[0] : null;
+    const timelineRect = firstTrack
+        ? firstTrack.querySelector('.track-timeline').getBoundingClientRect()
+        : null;
 
-    // Clean up old global lines
-    document.querySelectorAll('.persisted-line').forEach(el => {
-        const match = el.id.match(/^persist-line-(-?\d+)$/);
-        if (match && !activeAts.has(parseInt(match[1]))) {
-            el.remove();
-        }
-    });
+    const nowMs = Date.now();
+    // Visible window in epoch minutes
+    const windowStartMin = Math.floor((nowMs / 60000) + (scrollOffset - zoom) * 60);
+    const windowEndMin   = Math.ceil((nowMs / 60000) + (scrollOffset + zoom) * 60);
 
-    // Clean up old track displays
-    tracks.forEach(track => {
-        track.querySelectorAll('.persisted-display').forEach(el => {
-            const match = el.className.match(/persist-display-(-?\d+)/);
-            if (match && !activeAts.has(parseInt(match[1]))) {
-                el.remove();
-            }
+    // Collect all (event, occurrenceEpochMin, occurrenceIndex) tuples
+    const occurrenceLines = [];
+    events.forEach(event => {
+        const occurrences = getOccurrences(event, windowStartMin, windowEndMin);
+        occurrences.forEach((epochMin, idx) => {
+            occurrenceLines.push({ event, epochMin, idx });
         });
     });
 
-    if (persists.length === 0 || tracks.length === 0) return;
+    const activeLineIds = new Set(occurrenceLines.map(({ event, idx }) => `persist-line-${event.id}-${idx}`));
+    const activeDisplayPrefix = new Set(occurrenceLines.map(({ event, idx }) => `persist-display-${event.id}-${idx}`));
 
-    const firstTrack = tracks[0];
-    const timeline = firstTrack.querySelector('.track-timeline');
-    const timelineRect = timeline.getBoundingClientRect();
+    // Remove stale global lines
+    document.querySelectorAll('.persisted-line').forEach(el => {
+        if (!activeLineIds.has(el.id)) el.remove();
+    });
 
-    persists.forEach(persist => {
-        const hours = (persist.at * 60000 - Date.now()) / 3600000;
+    // Remove stale track displays
+    tracks.forEach(track => {
+        track.querySelectorAll('.persisted-display').forEach(el => {
+            // class list contains the unique display id as a class
+            const match = el.className.match(/persist-display-[^\s]+/);
+            if (match && !activeDisplayPrefix.has(match[0])) el.remove();
+        });
+    });
+
+    if (occurrenceLines.length === 0 || tracks.length === 0) return;
+
+    occurrenceLines.forEach(({ event, epochMin, idx }) => {
+        const lineId = `persist-line-${event.id}-${idx}`;
+        const displayClass = `persist-display-${event.id}-${idx}`;
+        const isRecurring = !!event.recurrence;
+
+        const hours = (epochMin * 60000 - nowMs) / 3600000;
         const x = timelineRect.left + timelineRect.width * (0.5 + (hours - scrollOffset) / (2 * zoom));
 
-        // Global line
-        let lineEl = document.getElementById('persist-line-' + persist.at);
+        // ── Global line ───────────────────────────────────────────────────────
+        let lineEl = document.getElementById(lineId);
         if (!lineEl) {
             lineEl = document.createElement('div');
-            lineEl.id = 'persist-line-' + persist.at;
-            lineEl.className = 'persisted-line';
-            const label = document.createElement('div');
-            label.className = 'line-offset-label persisted-label';
+            lineEl.id = lineId;
+            lineEl.className = 'persisted-line' + (isRecurring ? ' persisted-line--recurring' : '');
+
+            const labelChip = document.createElement('div');
+            labelChip.className = 'line-offset-label persisted-label';
+            labelChip.style.pointerEvents = 'auto';
+            labelChip.style.cursor = 'pointer';
+            labelChip.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (onEventClick) onEventClick(event);
+            });
+
+            if (isRecurring) {
+                const recurIcon = document.createElement('span');
+                recurIcon.className = 'persist-recur-icon';
+                recurIcon.textContent = '↻';
+                labelChip.appendChild(recurIcon);
+            }
+
             const offsetText = document.createElement('span');
             offsetText.className = 'persist-offset-text';
-            label.appendChild(offsetText);
+            labelChip.appendChild(offsetText);
+
             const labelText = document.createElement('span');
             labelText.className = 'persist-label-text';
-            label.appendChild(labelText);
-            lineEl.appendChild(label);
+            labelChip.appendChild(labelText);
+
+            lineEl.appendChild(labelChip);
             document.body.appendChild(lineEl);
         }
+
         lineEl.style.left = x + 'px';
         lineEl.style.display = 'block';
 
-        const offsetMs = persist.at * 60000 - Date.now();
-        const offsetStr = formatOffset(offsetMs);
-        lineEl.querySelector('.persist-label-text').textContent = persist.label || '';
-        lineEl.querySelector('.persist-offset-text').textContent = offsetStr;
+        const offsetMs = epochMin * 60000 - nowMs;
+        lineEl.querySelector('.persist-offset-text').textContent = formatOffset(offsetMs);
+        lineEl.querySelector('.persist-label-text').textContent = event.label || '';
 
-        // Track displays
+        // ── Track displays ────────────────────────────────────────────────────
         tracks.forEach(track => {
-            let displayEl = track.querySelector('.persist-display-' + persist.at);
+            let displayEl = track.querySelector('.' + displayClass);
             if (!displayEl) {
                 displayEl = document.createElement('div');
-                displayEl.className = 'track-time-display persisted-display persist-display-' + persist.at;
+                displayEl.className = `track-time-display persisted-display ${displayClass}`;
                 displayEl.innerHTML = '<span class="time-part"></span><span class="date-part"></span>';
                 track.querySelector('.track-timeline').appendChild(displayEl);
             }
